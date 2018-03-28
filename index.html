@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello World!</title>
+  </head>
+  <body>
+    <p>machine name: <span id="os_csname">Loading...</span></p>
+    <p>os caption: <span id="os_caption">Loading...</span></p>
+    <p>os architecture: <span id="os_architecture">Loading...</span></p>
+    <p>cpu architecture: <span id="cpu_architecture">Loading...</span></p>
+    <p>cpu name: <span id="cpu_name">Loading...</span></p>
+    <p>cpu number of cores: <span id="cpu_numberofcores">Loading...</span></p> 
+    <p>cpu loadpercentage: <b><span id="cpu_loadpercentage">Loading...</span></p></b>
+    <p>total physical memory: <span id="computersystem_totalphysicalmemory">Loading...</span></p>
+    <p>free physical memory: <b><span id="os_freephysicalmemory">Loading...</span></p></b>
+    <p>used physical memory: <b><span id="os_usedphysicalmemory">Loading...</span></p></b>
+    <p>percent physical memory: <b><span id="os_percentphysicalmemory">Loading...</span></p></b>
+    <script>
+      // You can also require other files to run in this process
+      require('./renderer.js')
+    </script>
+  </body>
+</html>
