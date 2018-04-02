@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Hello World!</title>
+    <title>Michcom monitoring</title>
   </head>
   <body>
     <p>machine name: <span id="os_csname">Loading...</span></p>
@@ -11,11 +11,19 @@
     <p>cpu architecture: <span id="cpu_architecture">Loading...</span></p>
     <p>cpu name: <span id="cpu_name">Loading...</span></p>
     <p>cpu number of cores: <span id="cpu_numberofcores">Loading...</span></p> 
-    <p>cpu loadpercentage: <b><span id="cpu_loadpercentage">Loading...</span></p></b>
+    <p>cpu loadpercentage: <b><span id="cpu_loadpercentage">Loading...</span></b></p>
     <p>total physical memory: <span id="computersystem_totalphysicalmemory">Loading...</span></p>
-    <p>free physical memory: <b><span id="os_freephysicalmemory">Loading...</span></p></b>
-    <p>used physical memory: <b><span id="os_usedphysicalmemory">Loading...</span></p></b>
-    <p>percent physical memory: <b><span id="os_percentphysicalmemory">Loading...</span></p></b>
+    <p>free physical memory: <b><span id="os_freephysicalmemory">Loading...</span></b></p>
+    <p>used physical memory: <b><span id="os_usedphysicalmemory">Loading...</span></b></p>
+    <p>percent physical memory: <b><span id="os_percentphysicalmemory">Loading...</span></b></p>
+    <p>last boot up: <span id="os_lastbootuptime">Loading...</span></p>
+    <p>local date time: <b><span id="os_localdatetime">Loading...</span></b></p>
+
+    <form id="config">
+      <input type="text" id="server" name="server">
+      <input type="text" id="token" name="token">
+      <input type="submit" value="Cambiar configuración">
+    </form>
     <script>
       // You can also require other files to run in this process
       require('./renderer.js')

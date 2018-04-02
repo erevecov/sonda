@@ -3,121 +3,292 @@
 // All of the Node.js APIs are available in this process.
 const os = require('os');
 const $ = require('jquery');
-const con = require('electron').remote.getGlobal('console');
 const cmd = require('node-cmd');
 const powershell = require("powershell");
+const wmic = require('wmic-js');
+const fs = require('fs');
 
 let machine = {};
 let totalmem = 0;
+let token = '';
+let server = '';
 
-function cleanData(data) {
-    let cleanData = data.replace(/\n|\r/g,'');
-    cleanData = cleanData.split('=');
-    return cleanData[1];
+$(document).ready(function(){
+    getConfig().then(data=>{
+        console.log(data);
+        server = data.server;
+        token = data.token;
+
+        $('#server').val(data.server);
+        $('#token').val(data.token);
+    });
+
+    firstInit().then(res=>{
+        $('#os_csname').html(res.os.csname);
+        $('#os_caption').html(res.os.caption);
+        $('#cpu_name').html(res.cpu.name);
+        $('#cpu_numberofcores').html(res.cpu.numberofcores);
+        $('#cpu_loadpercentage').html(res.cpu.loadpercentage);
+        $('#computersystem_totalphysicalmemory').html(res.memory.totalphysicalmemory);
+        $('#os_usedphysicalmemory').html(res.memory.usedphysicalmemory); 
+        $('#os_freephysicalmemory').html(res.memory.freephysicalmemory);
+        $('#os_architecture').html(res.os.architecture);
+        $('#cpu_architecture').html(res.cpu.architecture);
+        $('#os_percentphysicalmemory').html(res.memory.percentphysicalmemory);
+        $('#os_lastbootuptime').html(res.os.lastbootuptime);
+        $('#os_localdatetime').html(res.os.localdatetime);
+    
+        /*
+        res.disk.forEach(element => {
+            console.log(element)
+        });
+        */
+    });
+    
+    
+    setInterval(() => {
+        intervalData().then(res=>{
+            $('#cpu_loadpercentage').html(res.cpu.loadpercentage);
+            $('#os_freephysicalmemory').html(res.memory.freephysicalmemory);
+            $('#os_usedphysicalmemory').html(res.memory.usedphysicalmemory);
+            $('#os_percentphysicalmemory').html(res.memory.percentphysicalmemory);
+            $('#os_localdatetime').html(res.os.localdatetime);
+        });
+    }, 5000);
+});
+
+$('#config').on('submit', function(e) {
+    e.preventDefault();
+    console.log('test');
+});
+
+function getConfig() {
+    return new Promise(resolve=>{
+        fs.readFile('./config.json', 'utf8', function (err, data) {
+            if (err) throw err;
+            resolve(JSON.parse(data));
+        });
+    });
 }
 
-function wmic(wmicString) {
+function wmicHandler(alias, arr) {
     return new Promise(resolve=>{
-        cmd.get(
-            'wmic '+wmicString+' /value',
-            function(err, data, stderr){
-                resolve(cleanData(data));
+        wmic().alias(alias).get(arr).then(data=>{
+            resolve(data);
+        });
+    });
+}
+
+function sendData(data) {
+    ajax({
+        url: server+'/api/monitoring',
+        type: 'POST',
+        data: {
+            mon: JSON.stringify(data),
+            token: token
+        }
+    }).then(res=>{
+        console.log('yes');
+    }).catch(res=>{
+        console.log('no');
+    });
+}
+
+function diskHandler(logicalDisk) {
+    return new Promise(resolve=>{
+        let diskInfo = logicalDisk.reduce(function(results, disk) {
+            let newDisk = { 
+                caption: disk.Caption,
+                description: disk.Description,
+                name: disk.Name,
+                size: parseInt(disk.Size)/1024,
+                freespace: parseInt(disk.FreeSpace)/1024
+            };
+
+            if(disk.DriveType == '2') {
+                newDisk.type = 'removable';
+            } else if(disk.DriveType == '3') {
+                newDisk.type = 'local';
+            } else if(disk.DriveType == '4') {
+                newDisk.type = 'net';
+            } else if(disk.DriveType == '5') {
+                newDisk.type = 'cd';
+                newDisk.volumename = disk.VolumeName;
             }
-        );
+
+            if(newDisk.type == 'cd') {
+                if(newDisk.size > 0) {
+                    results.push(newDisk);
+                }
+            } else {
+                results.push(newDisk);
+            }
+            
+            return results;
+        }, []);
+
+        resolve(diskInfo);
     });
 }
 
 async function intervalData() {  
-    let cpu_loadpercentage = await wmic('cpu get LoadPercentage');
-    let os_freephysicalmemory = await wmic('os get freephysicalmemory');
-    
-    machine = {
-        cpu: {
-            loadpercentage: cpu_loadpercentage
-        },
-        memory: {
-            freephysicalmemory: (os_freephysicalmemory/1024).toFixed(),
-            usedphysicalmemory: (totalmem-(os_freephysicalmemory/1024)).toFixed(),
-            percentphysicalmemory: (((totalmem-(os_freephysicalmemory/1024)).toFixed() / totalmem) * 100).toFixed()
-        }
-    }; 
+    let cpu = await wmicHandler('cpu', [
+        'loadpercentage'
+    ]);
 
-    return machine;
-};
+    let os = await wmicHandler('os', [
+        'freephysicalmemory',
+        'localdatetime'
+    ]);
 
-async function firstInit() {
-    let os_csname = await wmic('os get csname');
-    let os_caption = await wmic('os get caption');
-    let cpu_osarchitecture = await wmic('cpu get addresswidth');
-    let cpu_cpuarchitecture = await wmic('cpu get datawidth');
-    let cpu_name = await wmic('cpu get name');
-    let cpu_numberofcores = await wmic('cpu get numberofcores');
-    let cpu_loadpercentage = await wmic('cpu get loadpercentage');
-    let computersystem_totalphysicalmemory = await wmic('computersystem get totalphysicalmemory');
-    let os_freephysicalmemory = await wmic('os get freephysicalmemory');
+    let logicaldisk = await wmicHandler('logicaldisk', [
+        'size',
+        'freespace',
+        'caption',
+        'drivetype',
+        'description',
+        'name',
+        'volumename'
+    ]);
 
-    totalmem = (computersystem_totalphysicalmemory/1024)/1024;
+    let localDate = os[0].LocalDateTime.split('.')[0]; 
+    localDate = `${localDate.slice(6, 8)}/${localDate.slice(4, 6)}/${localDate.slice(0, 4)} ${localDate.slice(8, 10)}:${localDate.slice(10, 12)}:${localDate.slice(12, 14)}`;
 
+    let disk = await diskHandler(logicaldisk);    
+
+    machine.os.localdatetime = localDate;
+    machine.cpu.loadpercentage = cpu[0].LoadPercentage;
+    machine.memory.freephysicalmemory = (os[0].FreePhysicalMemory/1024).toFixed();
+    machine.memory.usedphysicalmemory = (totalmem-(os[0].FreePhysicalMemory/1024)).toFixed();
+    machine.memory.percentphysicalmemory = (((totalmem-(os[0].FreePhysicalMemory/1024)).toFixed() / totalmem) * 100).toFixed();
+    machine.disk = disk;
+
+    /*
     machine = {
         os: {
-            csname: os_csname,
-            caption: os_caption,
-            architecture: cpu_osarchitecture
+            localdatetime: localDate        
         },
         cpu: {
-            name: cpu_name,
-            numberofcores: cpu_numberofcores,
-            loadpercentage: cpu_loadpercentage,
-            architecture: cpu_cpuarchitecture
+            loadpercentage: cpu[0].LoadPercentage
         },
-        memory:{
-            totalphysicalmemory: ((computersystem_totalphysicalmemory/1024)/1024).toFixed(),
-            freephysicalmemory: (os_freephysicalmemory/1024).toFixed(),
-            usedphysicalmemory: (((computersystem_totalphysicalmemory/1024)/1024)-(os_freephysicalmemory/1024)).toFixed(),
-            percentphysicalmemory: (((totalmem-(os_freephysicalmemory/1024)).toFixed() / totalmem) * 100).toFixed()
-        }
-    };
-
+        memory: {
+            freephysicalmemory: (os[0].FreePhysicalMemory/1024).toFixed(),
+            usedphysicalmemory: (totalmem-(os[0].FreePhysicalMemory/1024)).toFixed(),
+            percentphysicalmemory: (((totalmem-(os[0].FreePhysicalMemory/1024)).toFixed() / totalmem) * 100).toFixed()
+        },
+        disk: disk
+    }; 
+    */
+    
+    sendData(machine);
     return machine;
 }
 
-firstInit().then(res=>{
-    $('#os_csname').html(res.os.csname);
-    $('#os_caption').html(res.os.caption);
-    $('#cpu_name').html(res.cpu.name);
-    $('#cpu_numberofcores').html(res.cpu.numberofcores);
-    $('#cpu_loadpercentage').html(res.cpu.loadpercentage);
-    $('#computersystem_totalphysicalmemory').html(res.memory.totalphysicalmemory);
-    $('#os_usedphysicalmemory').html(res.memory.usedphysicalmemory); 
-    $('#os_freephysicalmemory').html(res.memory.freephysicalmemory);
-    $('#os_architecture').html(res.os.architecture);
-    $('#cpu_architecture').html(res.cpu.architecture);
-    $('#os_percentphysicalmemory').html(res.memory.percentphysicalmemory);
-});
+async function firstInit() {
+    let os = await wmicHandler('os', [
+        'csname',
+        'caption',
+        'freephysicalmemory',
+        'lastbootuptime',
+        'localdatetime'
+    ]);
 
-setInterval(() => {
-    intervalData().then(res=>{
-        $('#cpu_loadpercentage').html(res.cpu.loadpercentage);
-        $('#os_freephysicalmemory').html(res.memory.freephysicalmemory);
-        $('#os_usedphysicalmemory').html(res.memory.usedphysicalmemory);
-        $('#os_percentphysicalmemory').html(res.memory.percentphysicalmemory);
-    });
+    let cpu = await wmicHandler('cpu', [
+        'addresswidth',
+        'datawidth',
+        'name',
+        'numberofcores',
+        'loadpercentage'        
+    ]);
 
-    //$('#hostname').html(os.hostname());
-    //$('#ram').html(os.freemem());
-    //con.log(os.release());
-    //con.log(os.totalmem());
+    let logicaldisk = await wmicHandler('logicaldisk', [
+        'size',
+        'freespace',
+        'caption',
+        'drivetype',
+        'description',
+        'name',
+        'volumename'
+    ]);
+
+    let computersystem = await wmicHandler('computersystem', [
+        'totalphysicalmemory'
+    ]);
+
+    let bootDate = os[0].LastBootUpTime.split('.')[0];
+    let localDate = os[0].LocalDateTime.split('.')[0];
+    bootDate = `${bootDate.slice(6, 8)}/${bootDate.slice(4, 6)}/${bootDate.slice(0, 4)} ${bootDate.slice(8, 10)}:${bootDate.slice(10, 12)}:${bootDate.slice(12, 14)}`;
+    localDate = `${localDate.slice(6, 8)}/${localDate.slice(4, 6)}/${localDate.slice(0, 4)} ${localDate.slice(8, 10)}:${localDate.slice(10, 12)}:${localDate.slice(12, 14)}`;
+
+    totalmem = (computersystem[0].TotalPhysicalMemory/1024)/1024;
     
-    //con.log(machine);
-    //$('#cpu_loadpercentage').html(machine.cpu.loadpercentage);
-}, 5000);
+    //console.log(logicaldisk)
+
+    let disk = await diskHandler(logicaldisk);    
+
+    machine = {
+        os: {
+            csname: os[0].CSName,
+            caption: os[0].Caption,
+            architecture: cpu[0].AddressWidth,
+            lastbootuptime: bootDate,
+            localdatetime: localDate
+        },
+        cpu: {
+            name: cpu[0].Name,
+            numberofcores: cpu[0].NumberOfCores,
+            loadpercentage: cpu[0].LoadPercentage,
+            architecture: cpu[0].DataWidth
+        },
+        memory:{
+            totalphysicalmemory: totalmem.toFixed(),
+            freephysicalmemory: (os[0].FreePhysicalMemory/1024).toFixed(),
+            usedphysicalmemory: (totalmem-(os[0].FreePhysicalMemory/1024)).toFixed(),
+            percentphysicalmemory: (((totalmem-(os[0].FreePhysicalMemory/1024)).toFixed() / totalmem) * 100).toFixed()
+        },
+        disk: disk
+    };
+
+    sendData(machine);
+    return machine;
+}
+
+const ajax = ({type, url, data}) => {     
+    return new Promise((resolve, reject)=>{
+        let options = {
+            url
+        };
+        if(!type){
+            options.type = 'GET';
+        } else {
+            options.type = type;
+        }
+
+        if(data) options.data = data;
+
+        $.ajax(options)
+        .done((result) => {
+            resolve(result);
+        })
+        .fail(() => {
+            reject({error: 'ERROR IN --> '+url+' <--'});
+        });
+    });
+};
 
 /*
 setInterval(()=>{
-    new powershell('get-process')
+    new powershell(`
+    $wmio = Get-WmiObject win32_operatingsystem -ComputerName '127.0.0.1'
+    $LocalTime = [management.managementDateTimeConverter]::ToDateTime($wmio.localdatetime)
+    $LastBootUptime = [management.managementDateTimeConverter]::ToDateTime($wmio.lastbootuptime)
+    $timespan = $localTime - $lastBootUptime
+    $timespan
+    `)
     .on("output", data => {
-        con.log(data);
+        console.log(data);
     });
     
 },5000)
+
 */

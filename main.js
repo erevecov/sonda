@@ -5,9 +5,8 @@ const url = require('url')
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
-let mainWindow
-let tray = null
-
+let mainWindow;
+let tray = null;
 
 function createWindow () {
   // Create the browser window.
@@ -16,7 +15,7 @@ function createWindow () {
     height: 600,
     //backgroundColor: '#74b9ff',
     //frame: false,
-    icon: path.join(__dirname, 'img/check.ico')
+    icon: path.join(__dirname, 'img/michcom.ico')
   });
 
   // and load the index.html of the app.
@@ -56,26 +55,26 @@ function createWindow () {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', ()=>{
-  tray = new Tray('img/check.ico');
+  tray = new Tray('img/michcom.ico');
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'close', click: function(){
+      label: 'cerrar', click: function(){
         app.quit();
         mainWindow.removeAllListeners('close');
         mainWindow.close();
-        process.exit()
+        process.exit();
       }
     }
-  ])
-  tray.setToolTip('This is my application.')
-  tray.setContextMenu(contextMenu)
+  ]);
+  tray.setToolTip('Monitoreo remoto michcom');
+  tray.setContextMenu(contextMenu);
   
   tray.on('click', function() {
     mainWindow.show();
   });
 
   createWindow();
-  mainWindow.setMenu(null);
+  //mainWindow.setMenu(null); // herramientas
 });
 
 // Quit when all windows are closed.
@@ -94,6 +93,11 @@ app.on('activate', function () {
     createWindow()
   }
 })
+
+process.on('uncaughtException', function (err) {
+  console.log(err);
+})
+
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
